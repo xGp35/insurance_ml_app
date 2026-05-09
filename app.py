@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field,field_validator
 from typing import Literal, Annotated
 import pickle
 import pandas as pd
@@ -8,6 +8,9 @@ import pandas as pd
 # import the ml model
 with open ('model.pkl', 'rb') as f:
     model = pickle.load(f)
+
+#Ideally this should be coming grom MLFlow
+MODEL_VERSION = '1.0.0'
 
 tier_1_cities = ["Mumbai", "Delhi", "Bangalore", "Chennai", "Kolkata", "Hyderabad", "Pune"]
 tier_2_cities = [
@@ -30,6 +33,12 @@ class UserInput(BaseModel):
     smoker: Annotated[bool, Field(..., description='Is User a smoker')]
     city: Annotated[str, Field(..., description='The city that the user belongs to')]
     occupation: Annotated[Literal['retired', 'freelancer', 'student', 'government_job', 'business_owner', 'unemployed', 'private_job'], Field(..., description='Occupation of the user')]
+
+    @field_validator('city')
+    @classmethod
+    def normalize_city(cls, v: str) -> str:
+        v = v.strip().title()
+        return v
 
     @computed_field
     @property
@@ -67,6 +76,20 @@ class UserInput(BaseModel):
         else:
             return 3
         
+#human readable
+@app.get('/')
+def home():
+    return {'message': 'Insurance Premium Prediction API'}
+
+#machine readable
+@app.get('/health')
+def health_check():
+    return {
+        'status' : 'OK',
+        'version': MODEL_VERSION,
+        'model_loaded': model is not None
+    }
+
 @app.post('/predict')
 def predict_premium(data: UserInput):
 
@@ -81,4 +104,4 @@ def predict_premium(data: UserInput):
 
     prediction = model.predict(input_df)[0]
 
-    return JSONResponse(status_code=200, content={'predicted_category': prediction})
+    return JSONResponse(status_code=200, content={'predicted_ category': prediction})
